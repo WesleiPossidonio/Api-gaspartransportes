@@ -1,8 +1,7 @@
 import Sequelize from 'sequelize'
 
-
-import configDatabase from '../config/database'
-import Token from '../app/models/Token'
+import { configDatabase } from '../config/database.js';
+import Token from '../app/models/Token.js'
 
 const models = [Token]
 

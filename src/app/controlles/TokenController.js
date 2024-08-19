@@ -1,6 +1,6 @@
 import * as Yup from 'yup';
-import axios from 'axios';
-import Tokens from '../models/Token'; // Ajuste o caminho para a sua model Token
+import fetch from 'node-fetch';  // Importando node-fetch
+import Tokens from '../models/Token.js'; // Ajuste o caminho para a sua model Token
 
 class TokenController {
   // Rota POST para armazenar um novo token
@@ -39,29 +39,41 @@ class TokenController {
 
       if (daysSinceLastUpdate >= 50) {
         try {
-          const tokenResponse = await axios.get('https://graph.instagram.com/refresh_access_token', {
-            params: {
-              grant_type: 'ig_refresh_token',
-              access_token: existingToken.link_token,
-            },
+          // Adicionando parâmetros de consulta diretamente à URL
+          const tokenUrl = new URL('https://graph.instagram.com/refresh_access_token');
+          tokenUrl.searchParams.append('grant_type', 'ig_refresh_token');
+          tokenUrl.searchParams.append('access_token', existingToken.link_token);
+
+          const tokenResponse = await fetch(tokenUrl.toString(), {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
           });
 
-          const newToken = tokenResponse.data.access_token;
+          const tokenData = await tokenResponse.json();
+          const newToken = tokenData.access_token;
           existingToken.link_token = newToken;
           existingToken.updatedAt = currentDate;
           await existingToken.save();
           
           // Atualiza o token e obtém os dados adicionais
           try {
-            const apiResponse = await axios.get('https://graph.instagram.com/me/media', {
-              params: {
-                fields: 'id,caption,media_type,media_url,thumbnail_url,permalink',
-                access_token: newToken,
-              },
+            const apiUrl = new URL('https://graph.instagram.com/me/media');
+            apiUrl.searchParams.append('fields', 'id,caption,media_type,media_url,thumbnail_url,permalink');
+            apiUrl.searchParams.append('access_token', newToken);
+
+            const apiResponse = await fetch(apiUrl.toString(), {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              }
             });
+
+            const apiData = await apiResponse.json();
       
             return response.status(200).json({
-              data: apiResponse.data.data
+              data: apiData.data
             });
           } catch (error) {
             console.error('Erro ao buscar dados da API do Instagram:', error);
@@ -71,23 +83,28 @@ class TokenController {
           return response.status(500).json({ error: 'Erro ao renovar o token.' });
         }
       } else {
-        // Chamando a api do facebook para buscar o feed do instagram 
+        // Chamando a API do Facebook para buscar o feed do Instagram 
         try {
-          const apiResponse = await axios.get('https://graph.instagram.com/me/media', {
-            params: {
-              fields: 'id,caption,media_type,media_url,thumbnail_url,permalink',
-              access_token: existingToken.link_token,
-            },
+          const apiUrl = new URL('https://graph.instagram.com/me/media');
+          apiUrl.searchParams.append('fields', 'id,caption,media_type,media_url,thumbnail_url,permalink');
+          apiUrl.searchParams.append('access_token', existingToken.link_token);
+
+          const apiResponse = await fetch(apiUrl.toString(), {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
           });
+
+          const apiData = await apiResponse.json();
     
           return response.status(200).json({
-            data: apiResponse.data.data
+            data: apiData.data
           });
         } catch (error) {
           console.error('Erro ao buscar dados da API do Instagram:', error);
           return response.status(500).json({ error: 'Erro ao buscar dados da API do Instagram.' });
         }
-      
       }
     } catch (error) {
       console.error('Erro ao acessar o token:', error);
