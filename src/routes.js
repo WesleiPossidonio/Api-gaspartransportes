@@ -6,6 +6,7 @@ const routes = new Router()
 
 routes.post('/tokenFeed', TokenController.store)
 routes.get('/feedInsta', TokenController.index)
+routes.put('/updateToken/:id', TokenController.update)
 
 routes.post('/sendMail', SendMail.store)
 

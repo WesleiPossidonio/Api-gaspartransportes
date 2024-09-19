@@ -60,7 +60,7 @@ class TokenController {
           // Atualiza o token e obtém os dados adicionais
           try {
             const apiUrl = new URL('https://graph.instagram.com/me/media');
-            apiUrl.searchParams.append('fields', 'id,caption,media_type,media_url,thumbnail_url,permalink');
+            apiUrl.searchParams.append('fields', 'id, caption, media_type, media_url, thumbnail_url, permalink, timestamp, username, like_count, comments_count');
             apiUrl.searchParams.append('access_token', newToken);
 
             const apiResponse = await fetch(apiUrl.toString(), {
@@ -86,7 +86,7 @@ class TokenController {
         // Chamando a API do Facebook para buscar o feed do Instagram 
         try {
           const apiUrl = new URL('https://graph.instagram.com/me/media');
-          apiUrl.searchParams.append('fields', 'id,caption,media_type,media_url,thumbnail_url,permalink');
+          apiUrl.searchParams.append('fields', 'id, caption, media_type, media_url, thumbnail_url, permalink, timestamp, username');
           apiUrl.searchParams.append('access_token', existingToken.link_token);
 
           const apiResponse = await fetch(apiUrl.toString(), {
@@ -99,6 +99,7 @@ class TokenController {
           const apiData = await apiResponse.json();
     
           return response.status(200).json({
+            id_Token: existingToken.id,
             data: apiData.data
           });
         } catch (error) {
@@ -111,6 +112,40 @@ class TokenController {
       return response.status(500).json({ error: 'Erro ao acessar o token.' });
     }
   }
+
+  async update(request, response) {
+    const schema = Yup.object().shape({
+      link_token: Yup.string().required(),
+    });
+  
+    try {
+      await schema.validateSync(request.body, { abortEarly: false });
+    } catch (err) {
+      return response.status(400).json({ error: err.errors });
+    }
+  
+    const { id } = request.params;
+  
+    const tokensExists = await Tokens.findOne({
+      where: { id },
+    });
+  
+    if (!tokensExists) {
+      return response.status(400).json({ error: 'Consulta Não Encontrada' });
+    }
+  
+    const { link_token } = request.body;
+  
+    await Tokens.update(
+      {
+        link_token,
+      },
+      { where: { id } }
+    );
+  
+    return response.json({ message: 'Status was updated successfully' });
+  }
+  
 }
 
 // Função para calcular a diferença em dias entre duas datas
