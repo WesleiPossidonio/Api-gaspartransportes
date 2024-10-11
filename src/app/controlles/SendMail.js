@@ -5,37 +5,42 @@ import { google } from 'googleapis';
 
 const OAuth2 = google.auth.OAuth2;
 
+let emailTransporter; // Variável para armazenar o transporter em cache
+
 const createTransporter = async () => {
-  try {
-    const oauth2Client = new OAuth2(
-      process.env.CLIENT_ID,
-      process.env.CLIENT_SECRET,
-      "https://developers.google.com/oauthplayground"
-    );
+  // Verifica se o transporter já foi criado
+  if (!emailTransporter) {
+    try {
+      const oauth2Client = new OAuth2(
+        process.env.CLIENT_ID,
+        process.env.CLIENT_SECRET,
+        "https://developers.google.com/oauthplayground"
+      );
 
-    oauth2Client.setCredentials({
-      refresh_token: process.env.REFRESH_TOKEN,
-    });
+      oauth2Client.setCredentials({
+        refresh_token: process.env.REFRESH_TOKEN,
+      });
 
-    const accessToken = await oauth2Client.getAccessToken();
+      const accessToken = await oauth2Client.getAccessToken();
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        type: 'OAuth2',
-        user: process.env.EMAIL,
-        accessToken,
-        clientId: process.env.CLIENT_ID,
-        clientSecret: process.env.CLIENT_SECRET,
-        refreshToken: process.env.REFRESH_TOKEN,
-      },
-    });
-
-    return transporter;
-  } catch (error) {
-    console.error('Erro ao criar o transportador:', error);
-    throw error;
+      emailTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          type: 'OAuth2',
+          user: process.env.EMAIL,
+          accessToken,
+          clientId: process.env.CLIENT_ID,
+          clientSecret: process.env.CLIENT_SECRET,
+          refreshToken: process.env.REFRESH_TOKEN,
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao criar o transportador:', error);
+      throw error;
+    }
   }
+  
+  return emailTransporter;
 };
 
 class SendEmail {
@@ -89,13 +94,13 @@ class SendEmail {
     }
 
     const sendEmail = async (emailOptions) => {
-      let emailTransporter = await createTransporter();
+      let emailTransporter = await createTransporter(); // Chama a função para obter o transporter
       await emailTransporter.sendMail(emailOptions);
     };
 
     const mailOptions = {
       from: `"${name}" <${process.env.EMAIL}>`,
-      to: 'weslei.possidonio@gmail.com',
+      to: 'comercial@gaspartransportes.com.br',
       subject: subject_title,
       html,
       headers: {
