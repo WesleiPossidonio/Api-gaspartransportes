@@ -7,7 +7,7 @@ export const configDatabase = {
   dialectModule: pg,
   host: process.env.DB_HOST,
   username: process.env.DB_USERNAME,
-  password: process.env.DE_PASSOWRD,
+  password: process.env.DE_PASSOWORD,
   database: process.env.DB_DATABASE,
   define: {
     timestamps: true,
