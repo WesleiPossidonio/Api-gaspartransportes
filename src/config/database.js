@@ -3,7 +3,7 @@ import pg from 'pg'
 dotenv.config()
 
 export const configDatabase = {
-  dialect: process.env.DB_DIALECT,
+  dialect: 'postgres',
   dialectModule: pg,
   host: process.env.DB_HOST,
   username: process.env.DB_USERNAME,
