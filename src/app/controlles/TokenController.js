@@ -29,89 +29,105 @@ class TokenController {
     const currentDate = new Date();
 
     try {
-      const existingToken = await Tokens.findOne();
+        const existingToken = await Tokens.findOne();
 
-      if (!existingToken) {
-        return response.status(404).json({ error: 'Token não encontrado.' });
-      }
-
-      const daysSinceLastUpdate = calculateDaysDifference(new Date(existingToken.updatedAt), currentDate);
-
-      if (daysSinceLastUpdate >= 50) {
-        try {
-          // Adicionando parâmetros de consulta diretamente à URL
-          const tokenUrl = new URL('https://graph.instagram.com/refresh_access_token');
-          tokenUrl.searchParams.append('grant_type', 'ig_refresh_token');
-          tokenUrl.searchParams.append('access_token', existingToken.link_token);
-
-          const tokenResponse = await fetch(tokenUrl.toString(), {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-
-          const tokenData = await tokenResponse.json();
-          const newToken = tokenData.access_token;
-          existingToken.link_token = newToken;
-          existingToken.updatedAt = currentDate;
-          await existingToken.save();
-          
-          // Atualiza o token e obtém os dados adicionais
-          try {
-            const apiUrl = new URL('https://graph.instagram.com/me/media');
-            apiUrl.searchParams.append('fields', 'id, caption, media_type, media_url, thumbnail_url, permalink, timestamp, username, like_count, comments_count');
-            apiUrl.searchParams.append('access_token', newToken);
-
-            const apiResponse = await fetch(apiUrl.toString(), {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-
-            const apiData = await apiResponse.json();
-      
-            return response.status(200).json({
-              data: apiData.data
-            });
-          } catch (error) {
-            console.error('Erro ao buscar dados da API do Instagram:', error);
-            return response.status(500).json({ error: 'Erro ao buscar dados da API do Instagram.' });
-          }
-        } catch (error) {
-          return response.status(500).json({ error: 'Erro ao renovar o token.' });
+        if (!existingToken) {
+            return response.status(404).json({ error: 'Token não encontrado.' });
         }
-      } else {
-        // Chamando a API do Facebook para buscar o feed do Instagram 
-        try {
-          const apiUrl = new URL('https://graph.instagram.com/me/media');
-          apiUrl.searchParams.append('fields', 'id, caption, media_type, media_url, thumbnail_url, permalink, timestamp, username');
-          apiUrl.searchParams.append('access_token', existingToken.link_token);
 
-          const apiResponse = await fetch(apiUrl.toString(), {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
+        const daysSinceLastUpdate = calculateDaysDifference(new Date(existingToken.updatedAt), currentDate);
+
+        if (daysSinceLastUpdate >= 50) {
+            try {
+                // Renovando o token
+                const tokenUrl = new URL('https://graph.instagram.com/refresh_access_token');
+                tokenUrl.searchParams.append('grant_type', 'ig_refresh_token');
+                tokenUrl.searchParams.append('access_token', existingToken.link_token);
+
+                const tokenResponse = await fetch(tokenUrl.toString(), {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const tokenData = await tokenResponse.json();
+
+                if (!tokenData.access_token) {
+                    return response.status(500).json({ error: 'Não foi possível renovar o token.' });
+                }
+
+                const newToken = tokenData.access_token;
+                existingToken.link_token = newToken;
+                existingToken.updatedAt = currentDate;
+                await existingToken.save();
+                
+                // Buscando dados de mídia
+                try {
+                    const apiUrl = new URL('https://graph.instagram.com/me/media');
+                    apiUrl.searchParams.append('fields', 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,username,like_count,comments_count');
+                    apiUrl.searchParams.append('access_token', newToken);
+
+                    const apiResponse = await fetch(apiUrl.toString(), {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const apiData = await apiResponse.json();
+                    
+                    if (!apiData.data) {
+                        return response.status(400).json({ error: 'Dados não encontrados. error no refresh token' });
+                    }
+
+                    return response.status(200).json({
+                        data: apiData.data
+                    });
+                    
+                } catch (error) {
+                    console.error('Erro ao buscar dados da API do Instagram:', error);
+                    return response.status(500).json({ error: 'Erro ao buscar dados da API do Instagram.' });
+                }
+            } catch (error) {
+                return response.status(500).json({ error: 'Erro ao renovar o token.' });
             }
-          });
+        } else {
+            // Token válido: chamando a API do Instagram
+            try {
+                const apiUrl = new URL('https://graph.instagram.com/me/media');
+                apiUrl.searchParams.append('fields', 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,username');
+                apiUrl.searchParams.append('access_token', existingToken.link_token);
 
-          const apiData = await apiResponse.json();
-    
-          return response.status(200).json({
-            id_Token: existingToken.id,
-            data: apiData.data
-          });
-        } catch (error) {
-          console.error('Erro ao buscar dados da API do Instagram:', error);
-          return response.status(500).json({ error: 'Erro ao buscar dados da API do Instagram.' });
+                const apiResponse = await fetch(apiUrl.toString(), {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const apiData = await apiResponse.json();
+
+                if (!apiData.data) {
+                    return response.status(400).json({ error: 'Dados não encontrados.' });
+                }
+
+                return response.status(200).json({
+                    id_Token: existingToken,
+                    data: apiData.data
+                });
+
+            } catch (error) {
+                console.error('Erro ao buscar dados da API do Instagram:', error);
+                return response.status(500).json({ error: 'Erro ao buscar dados da API do Instagram.' });
+            }
         }
-      }
     } catch (error) {
-      console.error('Erro ao acessar o token:', error);
-      return response.status(500).json({ error: 'Erro ao acessar o token.' });
+        console.error('Erro ao acessar o token:', error);
+        return response.status(500).json({ error: 'Erro ao acessar o token.' });
     }
-  }
+}
+
 
   async update(request, response) {
     const schema = Yup.object().shape({
